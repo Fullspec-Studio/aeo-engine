@@ -32,7 +32,7 @@ def match_product(mention: str, products: list[Product]) -> str | None:
         shared = m & pt
         if len(shared) < min(2, len(title_tokens)):
             continue
-        score = len(shared) / len(m | pt)
+        score = len(shared) / len(pt)
         if score > best_score:
             best_sku, best_score = p.sku, score
     return best_sku if best_score >= 0.5 else None
