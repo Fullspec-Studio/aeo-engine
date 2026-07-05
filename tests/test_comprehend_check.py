@@ -33,5 +33,7 @@ def test_weak_comprehend_signal_does_not_flag():
 
 
 def test_present_without_brand_in_text_flags():
-    flag = cross_check(_comprehend("POSITIVE", 0.9), "Merrell is the best choice.", _jr(), ["Acme"])
+    comprehend = _comprehend("POSITIVE", 0.9)
+    flag = cross_check(comprehend, "Merrell is the best choice.", _jr(), ["Acme"])
     assert flag == "low_confidence"
+    comprehend.detect_sentiment.assert_not_called()
