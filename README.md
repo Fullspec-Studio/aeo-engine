@@ -142,18 +142,20 @@ aws stepfunctions get-execution-history \
 
 ## Perplexity API key setup
 
-The `QueryEngines` Lambda needs a Perplexity API key. Store it in Secrets Manager
-under the path `aeo/perplexity` as a plaintext string:
+The `QueryEngines` Lambda needs a Perplexity API key. The PipelineStack reads it
+automatically from AWS Secrets Manager under the name `aeo/perplexity` — the
+operator just needs to create the secret once:
 
 ```bash
 aws secretsmanager create-secret \
   --name aeo/perplexity \
-  --secret-string "pplx-..."
+  --secret-string "$(op read 'op://Private/Perplexity/credential')"
 ```
 
-The PipelineStack passes `PERPLEXITY_API_KEY` to the Lambda via an environment
-variable sourced from this secret (add `fn.add_environment` referencing the secret
-or use Parameter Store; see `infra/stacks/pipeline_stack.py`).
+At deploy time, `PipelineStack` wires `PERPLEXITY_SECRET_ARN` into the
+`QueryEngines` Lambda and grants it `secretsmanager:GetSecretValue`. The handler
+resolves the key on first invocation and caches it for the lifetime of the
+container — no manual environment variable injection required.
 
 **For local development with 1Password**, resolve the key at runtime without
 embedding it in config files:

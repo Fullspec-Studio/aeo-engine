@@ -24,6 +24,7 @@ class CostCapExceeded(Exception):
 _conn = None
 _bedrock = _s3 = _comprehend = None
 _dsn_cache: str | None = None
+_perplexity_key: str | None = None
 
 
 def _resolve_dsn() -> str:
@@ -43,6 +44,19 @@ def _resolve_dsn() -> str:
         f"@{secret['host']}:{secret['port']}/{secret['dbname']}"
     )
     return _dsn_cache
+
+
+def _get_perplexity_key() -> str:
+    """Return PERPLEXITY_API_KEY; if unset, fetch from Secrets Manager via PERPLEXITY_SECRET_ARN (cached)."""
+    global _perplexity_key
+    if _perplexity_key is None:
+        key = os.environ.get("PERPLEXITY_API_KEY")
+        if not key:
+            arn = os.environ["PERPLEXITY_SECRET_ARN"]
+            resp = boto3.client("secretsmanager").get_secret_value(SecretId=arn)
+            key = resp["SecretString"]
+        _perplexity_key = key
+    return _perplexity_key
 
 
 def _clients():
@@ -94,7 +108,7 @@ def query_engines(event, context):
     n = event["samples_per_prompt"]
     envs = sample_models(bedrock, s3, bucket, event["run_id"], event["prompt_id"],
                          event["prompt_text"], config.BEDROCK_MODEL_IDS, n)
-    envs.append(sample_perplexity(os.environ["PERPLEXITY_API_KEY"], s3, bucket,
+    envs.append(sample_perplexity(_get_perplexity_key(), s3, bucket,
                                   event["run_id"], event["prompt_id"], event["prompt_text"], n))
     return {"run_id": event["run_id"], "store_id": event["store_id"],
             "prompt_id": event["prompt_id"],

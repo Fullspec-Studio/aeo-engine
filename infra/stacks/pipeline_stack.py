@@ -1,6 +1,7 @@
 import aws_cdk as cdk
 from aws_cdk import (aws_ec2 as ec2, aws_lambda as lam, aws_scheduler as scheduler,
-                     aws_iam as iam, aws_stepfunctions as sfn,
+                     aws_iam as iam, aws_secretsmanager as secretsmanager,
+                     aws_stepfunctions as sfn,
                      aws_stepfunctions_tasks as tasks)
 from constructs import Construct
 
@@ -32,13 +33,25 @@ class PipelineStack(cdk.Stack):
         handlers = {n: make_lambda(self, n, f"aeo.pipeline.handlers.{h}", vpc, db_secret)
                     for n, h in zip(names, ["plan_run", "query_engines", "analyze",
                                             "diagnose_and_draft", "persist"])}
-        for fn in handlers.values():
-            raw_bucket.grant_read_write(fn)
-            fn.add_to_role_policy(iam.PolicyStatement(
-                actions=["bedrock:InvokeModel", "bedrock:Converse",
-                         "comprehend:DetectSentiment", "comprehend:DetectEntities"],
+        # Raw bucket + bucket env: QueryEngines only
+        raw_bucket.grant_read_write(handlers["QueryEngines"])
+        handlers["QueryEngines"].add_environment("AEO_RAW_BUCKET", raw_bucket.bucket_name)
+
+        # Bedrock: QueryEngines, Analyze, DiagnoseAndDraft
+        for name in ("QueryEngines", "Analyze", "DiagnoseAndDraft"):
+            handlers[name].add_to_role_policy(iam.PolicyStatement(
+                actions=["bedrock:InvokeModel", "bedrock:Converse"],
                 resources=["*"]))
-            fn.add_environment("AEO_RAW_BUCKET", raw_bucket.bucket_name)
+
+        # Comprehend: Analyze only
+        handlers["Analyze"].add_to_role_policy(iam.PolicyStatement(
+            actions=["comprehend:DetectSentiment", "comprehend:DetectEntities"],
+            resources=["*"]))
+
+        # Perplexity secret: QueryEngines only
+        perplexity = secretsmanager.Secret.from_secret_name_v2(self, "PerplexitySecret", "aeo/perplexity")
+        handlers["QueryEngines"].add_environment("PERPLEXITY_SECRET_ARN", perplexity.secret_arn)
+        perplexity.grant_read(handlers["QueryEngines"])
 
         plan = tasks.LambdaInvoke(self, "Plan", lambda_function=handlers["PlanRun"],
                                   payload_response_only=True)

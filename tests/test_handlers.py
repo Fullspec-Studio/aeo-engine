@@ -57,3 +57,15 @@ def test_plan_run_enforces_cost_cap():
         with pytest.raises(CostCapExceeded):
             handlers.plan_run({"store_key": "demo"}, None)
         # 500 prompts × (3 bedrock models + 1 perplexity) × 5 samples = 10_000 > 4_000
+
+
+def test_perplexity_key_resolved_from_secret_arn(monkeypatch):
+    monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
+    monkeypatch.setenv("PERPLEXITY_SECRET_ARN", "arn:aws:secretsmanager:us-east-1:123:secret:aeo/perplexity")
+    handlers._perplexity_key = None
+    fake_sm = MagicMock()
+    fake_sm.get_secret_value.return_value = {"SecretString": "pplx-test-key"}
+    with patch.object(handlers.boto3, "client", return_value=fake_sm):
+        assert handlers._get_perplexity_key() == "pplx-test-key"
+        assert handlers._get_perplexity_key() == "pplx-test-key"  # cached
+    fake_sm.get_secret_value.assert_called_once()
