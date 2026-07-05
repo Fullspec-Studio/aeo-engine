@@ -37,3 +37,8 @@ def test_single_token_title_matches():
 
 def test_sku_mention_matches():
     assert match_product("I recommend the ACME-TRAIL-2", PRODUCTS) == "ACME-TRAIL-2"
+
+
+def test_generic_phrase_does_not_match():
+    # generic category words shared with a title must not count as presence
+    assert match_product("There are great trail hiking options at REI.", PRODUCTS) is None

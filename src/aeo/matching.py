@@ -20,7 +20,7 @@ def _tokens(text: str) -> set[str]:
 
 
 def match_product(mention: str, products: list[Product]) -> str | None:
-    """Return the SKU whose title tokens best cover the mention (Jaccard >= 0.5),
+    """Return the SKU whose title tokens best cover the mention (title-coverage >= 0.6),
     requiring at least 2 shared tokens for multi-token titles, or 1 for single-token titles."""
     m = _tokens(mention)
     if not m:
@@ -32,7 +32,8 @@ def match_product(mention: str, products: list[Product]) -> str | None:
         shared = m & pt
         if len(shared) < min(2, len(title_tokens)):
             continue
-        score = len(shared) / len(pt)
+        denom = title_tokens or pt
+        score = len(shared) / len(denom)
         if score > best_score:
             best_sku, best_score = p.sku, score
-    return best_sku if best_score >= 0.5 else None
+    return best_sku if best_score >= 0.6 else None
