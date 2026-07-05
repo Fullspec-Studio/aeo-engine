@@ -37,3 +37,22 @@ def test_unparseable_twice_returns_none():
     bedrock.converse.return_value = _tool_response({"priority": "urgent"})
     d = diagnose(bedrock, "gr-1", "1", PRODUCT, ["…"], ["Merrell"])
     assert d is None and bedrock.converse.call_count == 2
+
+
+def test_diagnose_without_guardrail_omits_guardrail_config():
+    """Empty guardrail_id → converse called WITHOUT guardrailConfig kwarg."""
+    bedrock = MagicMock()
+    bedrock.converse.return_value = _tool_response(GOOD)
+    diagnose(bedrock, "", "DRAFT", PRODUCT, ["Buy Merrell."], ["Merrell Moab"])
+    call_kwargs = bedrock.converse.call_args[1]
+    assert "guardrailConfig" not in call_kwargs
+
+
+def test_diagnose_with_guardrail_includes_guardrail_config():
+    """Non-empty guardrail_id → converse called WITH guardrailConfig kwarg."""
+    bedrock = MagicMock()
+    bedrock.converse.return_value = _tool_response(GOOD)
+    diagnose(bedrock, "gr-1", "1", PRODUCT, ["Buy Merrell."], ["Merrell Moab"])
+    call_kwargs = bedrock.converse.call_args[1]
+    assert "guardrailConfig" in call_kwargs
+    assert call_kwargs["guardrailConfig"]["guardrailIdentifier"] == "gr-1"

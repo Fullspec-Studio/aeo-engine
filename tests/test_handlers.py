@@ -59,6 +59,30 @@ def test_plan_run_enforces_cost_cap():
         # 500 prompts × (3 bedrock models + 1 perplexity) × 5 samples = 10_000 > 4_000
 
 
+def test_plan_run_returns_expected_observations():
+    with patch.object(handlers, "_load_store_and_prompts") as loader, \
+         patch.object(handlers, "repo") as mock_repo, \
+         patch.object(handlers, "_conn", MagicMock()):
+        loader.return_value = (1, [{"prompt_id": 1, "prompt_text": "q1"},
+                                   {"prompt_id": 2, "prompt_text": "q2"}])
+        mock_repo.create_run.return_value = 42
+        result = handlers.plan_run({"store_key": "demo"}, None)
+    # 2 prompts × (3 bedrock models + 1 perplexity) = 8
+    assert result["expected_observations"] == 8
+
+
+def test_fold_envelope_errors_excluded_from_samples_total():
+    """Spec §5: engine errors must NOT inflate samples_total."""
+    env = EngineEnvelope(prompt_text="q", engine="bedrock", model="m",
+                         samples=[_sample(), _sample()], errors=3)
+    judgements = [
+        JudgeResult(present=True, matched_sku="S", rank=1, sentiment="positive"),
+        JudgeResult(present=False, sentiment="neutral"),
+    ]
+    obs = _fold_envelope(env, judgements, ["ok", "ok"])
+    assert obs["samples_total"] == 2  # errors NOT counted
+
+
 def test_perplexity_key_resolved_from_secret_arn(monkeypatch):
     monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
     monkeypatch.setenv("PERPLEXITY_SECRET_ARN", "arn:aws:secretsmanager:us-east-1:123:secret:aeo/perplexity")

@@ -53,8 +53,21 @@ class PipelineStack(cdk.Stack):
         handlers["QueryEngines"].add_environment("PERPLEXITY_SECRET_ARN", perplexity.secret_arn)
         perplexity.grant_read(handlers["QueryEngines"])
 
-        plan = tasks.LambdaInvoke(self, "Plan", lambda_function=handlers["PlanRun"],
-                                  payload_response_only=True)
+        # Guardrail config: DiagnoseAndDraft (optional — provision and pass via cdk context to enforce)
+        handlers["DiagnoseAndDraft"].add_environment(
+            "AEO_GUARDRAIL_ID", self.node.try_get_context("guardrailId") or "")
+        handlers["DiagnoseAndDraft"].add_environment(
+            "AEO_GUARDRAIL_VERSION", self.node.try_get_context("guardrailVersion") or "DRAFT")
+
+        plan = tasks.LambdaInvoke(
+            self, "Plan",
+            lambda_function=handlers["PlanRun"],
+            payload_response_only=True,
+            payload=sfn.TaskInput.from_object({
+                "store_key.$": "$.store_key",
+                "execution_arn.$": "$$.Execution.Id",
+            }),
+        )
         per_prompt = (tasks.LambdaInvoke(self, "Query", lambda_function=handlers["QueryEngines"],
                                          payload_response_only=True)
                       .next(tasks.LambdaInvoke(self, "Judge", lambda_function=handlers["Analyze"],
@@ -73,8 +86,24 @@ class PipelineStack(cdk.Stack):
         persist = tasks.LambdaInvoke(self, "PersistResults", lambda_function=handlers["Persist"],
                                      payload_response_only=True)
         fail = sfn.Fail(self, "RunFailed")
+
+        # Shape the error output so PersistFailure can read run_id
+        persist_failure_shape = sfn.Pass(
+            self, "FinalizationShape",
+            parameters={"run_id.$": "$.run_id", "items": [], "failed": True},
+        )
+        persist_failure = tasks.LambdaInvoke(
+            self, "PersistFailure", lambda_function=handlers["Persist"],
+            payload_response_only=True,
+        )
+        persist_failure_shape.next(persist_failure).next(fail)
+
         definition = plan.next(fan_out).next(persist)
         plan.add_catch(fail, errors=["States.ALL"])
+        fan_out.add_catch(persist_failure_shape, errors=["States.ALL"],
+                          result_path=sfn.JsonPath.DISCARD)
+        persist.add_catch(persist_failure_shape, errors=["States.ALL"],
+                          result_path=sfn.JsonPath.DISCARD)
 
         sm = sfn.StateMachine(self, "RunMachine",
                               definition_body=sfn.DefinitionBody.from_chainable(definition))

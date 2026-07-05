@@ -66,16 +66,21 @@ def diagnose(bedrock, guardrail_id: str, guardrail_version: str, product: Produc
     )
     messages = [{"role": "user", "content": [{"text": user}]}]
     for _ in range(2):  # initial + one reprompt
-        resp = bedrock.converse(
-            modelId=JUDGE_MODEL_ID,
-            system=[{"text": _SYSTEM}],
-            messages=messages,
-            toolConfig={"tools": [DIAGNOSIS_TOOL],
-                        "toolChoice": {"tool": {"name": "record_diagnosis"}}},
-            guardrailConfig={"guardrailIdentifier": guardrail_id,
-                             "guardrailVersion": guardrail_version},
-            inferenceConfig={"temperature": 0.2},
-        )
+        kwargs: dict = {
+            "modelId": JUDGE_MODEL_ID,
+            "system": [{"text": _SYSTEM}],
+            "messages": messages,
+            "toolConfig": {"tools": [DIAGNOSIS_TOOL],
+                           "toolChoice": {"tool": {"name": "record_diagnosis"}}},
+            "inferenceConfig": {"temperature": 0.2},
+        }
+        # guardrail optional in v1 — provision and set AEO_GUARDRAIL_ID to enforce
+        if guardrail_id:
+            kwargs["guardrailConfig"] = {
+                "guardrailIdentifier": guardrail_id,
+                "guardrailVersion": guardrail_version,
+            }
+        resp = bedrock.converse(**kwargs)
         if resp.get("stopReason") == "guardrail_intervened":
             return Refusal(reason="guardrail_intervened")
         tool_input = None

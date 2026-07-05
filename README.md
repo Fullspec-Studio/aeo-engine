@@ -96,6 +96,11 @@ npx cdk bootstrap
 
 # 4. Deploy all stacks (DataStack → ApiStack + PipelineStack)
 npx cdk deploy --all --app "uv run python infra/app.py"
+
+# Optional: attach a Bedrock Guardrail to the DiagnoseAndDraft Lambda
+npx cdk deploy --all --app "uv run python infra/app.py" \
+  -c guardrailId=<your-guardrail-id> \
+  -c guardrailVersion=DRAFT
 ```
 
 CDK deploys in dependency order: `AeoData` first (VPC, Aurora, S3), then
@@ -117,6 +122,9 @@ curl -X POST "$API_URL/catalog" \
      -H "x-api-key: $API_KEY" \
      -H "Content-Type: application/json" \
      -d @tests/fixtures/catalog_push.json
+
+# 7. Seed prompts (generates AI-powered buyer-intent questions for your catalog)
+uv run python scripts/seed_prompts.py demo-outdoor-store
 ```
 
 ---
@@ -168,20 +176,14 @@ export PERPLEXITY_API_KEY=$(op read "op://Private/Perplexity/credential")
 
 ## Run evals
 
-The eval harness (`evals/run_evals.py`) validates judge accuracy, presence-rate
-statistics, fix-safety guardrails, and aggregation correctness against golden
-fixtures.
+The eval harness (`evals/run_evals.py`) judges 4 golden fixture answers and
+2 fix-safety fixture answers live against Amazon Bedrock, then compares the
+results to `evals/thresholds.json`. Exit code 1 means at least one threshold
+was breached.
 
 ```bash
-# Offline golden-fixture tests (fast, no AWS)
-uv run pytest evals/ -v
-
-# Live end-to-end sweep against real Bedrock + Perplexity
-export AEO_DSN="postgresql://..."
-export PERPLEXITY_API_KEY=$(op read "op://Private/Perplexity/credential")
-uv run python evals/run_evals.py --live
+# Requires only AWS credentials with Bedrock access — no DSN, no Perplexity key needed.
+uv run python evals/run_evals.py
 ```
 
-The `--live` flag runs a real sample sweep and asserts that presence rates, judge
-F1, and fix-safety thresholds all pass. It requires a seeded database with at least
-one store and active prompts.
+To gate on different thresholds, edit `evals/thresholds.json` before running.

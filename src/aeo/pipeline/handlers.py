@@ -99,7 +99,13 @@ def plan_run(event, context):
     if total > config.MAX_CALLS_PER_RUN:
         raise CostCapExceeded(f"{total} calls > cap {config.MAX_CALLS_PER_RUN}")
     run_id = repo.create_run(conn, store_id, event.get("execution_arn", ""))
-    return {"run_id": run_id, "store_id": store_id, "samples_per_prompt": n, "batches": prompts}
+    return {
+        "run_id": run_id,
+        "store_id": store_id,
+        "samples_per_prompt": n,
+        "batches": prompts,
+        "expected_observations": len(prompts) * (len(config.BEDROCK_MODEL_IDS) + 1),
+    }
 
 
 def query_engines(event, context):
@@ -129,7 +135,7 @@ def _fold_envelope(env: EngineEnvelope, judgements: list[JudgeResult | None],
     sentiments = Counter(j.sentiment for j in parseable)
     return {
         "engine": env.engine, "model": env.model,
-        "samples_total": len(env.samples) + env.errors,
+        "samples_total": len(env.samples),
         "samples_present": len(present),
         "rank": statistics.median(ranks) if ranks else None,
         "sentiment": sentiments.most_common(1)[0][0] if sentiments else None,
@@ -182,10 +188,13 @@ def diagnose_and_draft(event, context):
 
 
 def persist(event, context):
+    if event.get("failed"):
+        conn, *_ = _clients()
+        repo.finish_run(conn, event["run_id"], "failed", 0.0)
+        return {"run_id": event["run_id"], "status": "failed", "coverage": 0.0}
     conn, *_ = _clients()
     run_id = event["run_id"]
     expected = event.get("expected_observations", 0)
-    written = 0
     for item in event["items"]:
         for obs in item["observations"]:
             oid = repo.insert_observation(
@@ -194,7 +203,6 @@ def persist(event, context):
                 rank=obs["rank"], sentiment=obs["sentiment"], framing=obs["framing"],
                 competitors_named=obs["competitors_named"], citations=obs["citations"],
                 confidence_flag=obs["confidence_flag"], raw_s3_keys=obs["raw_s3_keys"])
-            written += 1
             diag = obs.get("diagnosis")
             if diag and not diag.get("refused"):
                 did = repo.insert_diagnosis(conn, oid, diag["reasons"], diag["priority"])
@@ -204,7 +212,12 @@ def persist(event, context):
                 did = repo.insert_diagnosis(conn, oid, ["guardrail_refused"], "high")
                 repo.insert_fix_draft(conn, did, "copy", "", status="refused",
                                       refusal_reason=diag["reason"])
-    coverage = written / expected if expected else 1.0
+    obs_with_samples = sum(
+        1 for item in event["items"]
+        for obs in item["observations"]
+        if obs["samples_total"] > 0
+    )
+    coverage = obs_with_samples / expected if expected else 1.0
     status = "complete" if coverage >= 1.0 else "degraded"
     repo.finish_run(conn, run_id, status, coverage)
     return {"run_id": run_id, "status": status, "coverage": coverage}
