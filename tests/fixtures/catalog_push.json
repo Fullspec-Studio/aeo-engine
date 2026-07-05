@@ -1,0 +1,23 @@
+{
+  "store_key": "demo-outdoor-store",
+  "brand_names": ["Acme Outdoor"],
+  "competitors": ["Merrell", "Salomon", "KEEN"],
+  "products": [
+    {
+      "sku": "ACME-TRAIL-2",
+      "title": "Acme Trail 2 Hiking Boot",
+      "description": "Waterproof leather hiking boot with Vibram sole.",
+      "price": 139.99,
+      "category": "hiking-boots",
+      "attributes": {"waterproof": "yes", "weight_g": "540"}
+    },
+    {
+      "sku": "ACME-CAMP-STOVE",
+      "title": "Acme Ultralight Camp Stove",
+      "description": "95g titanium canister stove.",
+      "price": 44.5,
+      "category": "camp-kitchen",
+      "attributes": {"weight_g": "95", "fuel": "isobutane"}
+    }
+  ]
+}
