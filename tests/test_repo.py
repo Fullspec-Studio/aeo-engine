@@ -43,3 +43,14 @@ def test_upsert_store_is_idempotent(conn):
     a = repo.upsert_store(conn, "demo", ["Acme"], [])
     b = repo.upsert_store(conn, "demo", ["Acme Outdoor"], ["Merrell"])
     assert a == b
+
+
+def test_replace_products_is_atomic(conn):
+    sid = repo.upsert_store(conn, "demo", ["Acme"], [])
+    repo.replace_products(conn, sid, [Product(sku="A", title="A one")])
+    bad = [Product(sku="B", title="B one"), Product(sku="B", title="dup sku violates unique")]
+    with pytest.raises(Exception):
+        repo.replace_products(conn, sid, bad)
+    with conn.cursor() as cur:
+        cur.execute("SELECT sku FROM product WHERE store_id = %s", (sid,))
+        assert [r[0] for r in cur.fetchall()] == ["A"]  # old row survived the failed replace

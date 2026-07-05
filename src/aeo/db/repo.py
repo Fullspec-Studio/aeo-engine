@@ -31,14 +31,15 @@ def upsert_store(conn, store_key: str, brand_names: list[str], competitors: list
 
 
 def replace_products(conn, store_id: int, products: list[Product]) -> None:
-    with conn.cursor() as cur:
-        cur.execute("DELETE FROM product WHERE store_id = %s", (store_id,))
-        for p in products:
-            cur.execute(
-                """INSERT INTO product (store_id, sku, title, description, price, category, attributes)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-                (store_id, p.sku, p.title, p.description, p.price, p.category, json.dumps(p.attributes)),
-            )
+    with conn.transaction():
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM product WHERE store_id = %s", (store_id,))
+            for p in products:
+                cur.execute(
+                    """INSERT INTO product (store_id, sku, title, description, price, category, attributes)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                    (store_id, p.sku, p.title, p.description, p.price, p.category, json.dumps(p.attributes)),
+                )
 
 
 def insert_prompts(conn, store_id: int, prompts: list[PromptSpec]) -> list[int]:
