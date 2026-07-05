@@ -65,3 +65,36 @@ def test_engine_breakdown_keys(seeded):
     conn, sid, _, runs = seeded
     bd = aggregate.engine_breakdown(conn, sid, runs[-1])
     assert set(bd) == {"bedrock:m-a"}
+
+
+def test_rolling_rate_pools_all_rows_of_last_n_runs(seeded):
+    conn, sid, pids, runs = seeded
+    # second observation for the same (run, prompt, engine, model) in the last run
+    repo.insert_observation(
+        conn, runs[-1], pids[0], engine="bedrock", model="m-a", samples_total=5, samples_present=5,
+        rank=1.0, sentiment="positive", framing="", competitors_named=[], citations=[],
+        confidence_flag="ok", raw_s3_keys=[])
+    ri = aggregate.rolling_prompt_rate(conn, pids[0], "bedrock", "m-a")
+    # 3 runs x 3/5 plus the extra 5/5 row = 14/20
+    assert ri.rate == pytest.approx(0.7)
+
+
+def test_sov_escapes_ilike_wildcards(seeded):
+    conn, sid, pids, runs = seeded
+    # Add an observation with "Keen Targhee" so 'K_EN' ILIKE can wildcard-match it pre-fix
+    repo.insert_observation(
+        conn, runs[-1], pids[0], engine="bedrock", model="m-a", samples_total=5, samples_present=3,
+        rank=1.0, sentiment="positive", framing="", competitors_named=["Keen Targhee"],
+        citations=[], confidence_flag="ok", raw_s3_keys=[])
+    with conn.cursor() as cur:
+        cur.execute("UPDATE store SET competitors = %s WHERE id = %s", ('["K_EN"]', sid))
+    sov = aggregate.share_of_voice(conn, sid, runs[-1])
+    # "K_EN" must NOT wildcard-match "Keen Targhee" via '_'
+    assert sov["K_EN"].rate == 0.0
+
+
+def test_sov_always_has_store_key(seeded):
+    conn, sid, _, _ = seeded
+    empty_run = repo.create_run(conn, sid, "arn:empty")
+    sov = aggregate.share_of_voice(conn, sid, empty_run)
+    assert "__store__" in sov and sov["__store__"].rate == 0.0

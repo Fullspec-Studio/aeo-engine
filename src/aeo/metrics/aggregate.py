@@ -1,6 +1,5 @@
 """Analytics = SQL aggregations over observation rows (spec §5). Every function
 returns Wilson intervals; unparseable rows are always excluded."""
-import json
 
 from aeo.stats import RateInterval, pooled_rate, wilson_interval
 
@@ -29,22 +28,22 @@ def visibility(conn, store_id: int, run_id: int) -> RateInterval | None:
 def share_of_voice(conn, store_id: int, run_id: int) -> dict[str, RateInterval]:
     out: dict[str, RateInterval] = {}
     own = visibility(conn, store_id, run_id)
-    if own:
-        out["__store__"] = own
+    out["__store__"] = own if own else wilson_interval(0, 1)
     with conn.cursor() as cur:
         cur.execute("SELECT competitors FROM store WHERE id = %s", (store_id,))
         competitors = cur.fetchone()[0]
         for comp in competitors:
+            esc = comp.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             cur.execute(
                 f"""SELECT COALESCE(SUM(CASE WHEN EXISTS (
                           SELECT 1 FROM jsonb_array_elements_text(o.competitors_named) c
-                          WHERE c ILIKE '%%' || %s || '%%')
+                          WHERE c ILIKE '%%' || %s || '%%' ESCAPE '\\')
                         THEN o.samples_total ELSE 0 END), 0),
                         COALESCE(SUM(o.samples_total), 0)
                     FROM observation o JOIN prompt p ON p.id = o.prompt_id
                     WHERE o.run_id = %s AND p.store_id = %s
                       AND p.type = 'product_intent' AND {_VALID}""",
-                (comp, run_id, store_id),
+                (esc, run_id, store_id),
             )
             ri = _rate(cur)
             out[comp] = ri if ri else wilson_interval(0, 1)
@@ -73,10 +72,16 @@ def rolling_prompt_rate(conn, prompt_id: int, engine: str, model: str,
     with conn.cursor() as cur:
         cur.execute(
             f"""SELECT o.samples_present, o.samples_total
-                FROM observation o JOIN run r ON r.id = o.run_id
+                FROM observation o
                 WHERE o.prompt_id = %s AND o.engine = %s AND o.model = %s AND {_VALID}
-                ORDER BY r.started_at DESC LIMIT %s""",
-            (prompt_id, engine, model, last_n_runs),
+                  AND o.run_id IN (
+                      SELECT r2.id FROM run r2
+                      WHERE EXISTS (SELECT 1 FROM observation o2
+                                    WHERE o2.run_id = r2.id AND o2.prompt_id = %s
+                                      AND o2.engine = %s AND o2.model = %s)
+                      ORDER BY r2.started_at DESC, r2.id DESC
+                      LIMIT %s)""",
+            (prompt_id, engine, model, prompt_id, engine, model, last_n_runs),
         )
         pairs = [(int(a), int(b)) for a, b in cur.fetchall()]
     return pooled_rate(pairs) if pairs else None
