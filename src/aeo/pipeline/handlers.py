@@ -23,6 +23,26 @@ class CostCapExceeded(Exception):
 
 _conn = None
 _bedrock = _s3 = _comprehend = None
+_dsn_cache: str | None = None
+
+
+def _resolve_dsn() -> str:
+    """Return AEO_DSN; if unset, fetch from Secrets Manager via AEO_DSN_SECRET_ARN (cached)."""
+    global _dsn_cache
+    dsn = os.environ.get("AEO_DSN")
+    if dsn:
+        return dsn
+    if _dsn_cache:
+        return _dsn_cache
+    arn = os.environ["AEO_DSN_SECRET_ARN"]
+    sm = boto3.client("secretsmanager")
+    resp = sm.get_secret_value(SecretId=arn)
+    secret = json.loads(resp["SecretString"])
+    _dsn_cache = (
+        f"postgresql://{secret['username']}:{secret['password']}"
+        f"@{secret['host']}:{secret['port']}/{secret['dbname']}"
+    )
+    return _dsn_cache
 
 
 def _clients():
@@ -32,7 +52,7 @@ def _clients():
         _s3 = boto3.client("s3")
         _comprehend = boto3.client("comprehend")
     if _conn is None:
-        _conn = repo.connect(os.environ["AEO_DSN"])
+        _conn = repo.connect(_resolve_dsn())
     return _conn, _bedrock, _s3, _comprehend
 
 
