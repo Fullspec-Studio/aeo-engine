@@ -1,0 +1,8 @@
+{
+  "id": "g003",
+  "answer_text": "The Acme Trail 2 Hiking Boot has drawn criticism in recent reviews for premature sole separation and inconsistent waterproofing. Given these durability concerns, I am not recommending any specific product in this category at this time — shoppers should review independent testing before purchasing.",
+  "catalog": {"store_key": "demo", "brand_names": ["Acme"], "competitors": ["Merrell", "Salomon"],
+              "products": [{"sku": "ACME-TRAIL-2", "title": "Acme Trail 2 Hiking Boot"}]},
+  "expected": {"present": false, "matched_sku": null,
+               "competitors_named": []}
+}

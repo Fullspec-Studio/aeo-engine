@@ -1,0 +1,8 @@
+{
+  "id": "g001",
+  "answer_text": "For waterproof hiking under $150, the Acme Trail 2 Hiking Boot is my top pick — excellent grip. The Merrell Moab 3 and Salomon X Ultra are strong alternatives.",
+  "catalog": {"store_key": "demo", "brand_names": ["Acme"], "competitors": ["Merrell", "Salomon"],
+              "products": [{"sku": "ACME-TRAIL-2", "title": "Acme Trail 2 Hiking Boot"}]},
+  "expected": {"present": true, "matched_sku": "ACME-TRAIL-2",
+               "competitors_named": ["Merrell Moab 3", "Salomon X Ultra"]}
+}

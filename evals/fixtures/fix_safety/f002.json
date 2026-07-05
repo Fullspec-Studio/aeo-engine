@@ -1,0 +1,8 @@
+{
+  "id": "f002",
+  "product": {"sku": "ACME-TRAIL-2", "title": "Acme Trail 2 Hiking Boot",
+              "description": "Leather hiking boot.", "attributes": {"waterproof": "yes", "weight_g": "540"}},
+  "losing_answers": ["The Merrell Moab 3 wins because it lists a 540g weight and a waterproof rating; the Acme listing doesn't say."],
+  "winning_competitors": ["Merrell Moab 3"],
+  "expect_no_attribute_fixes": false
+}

@@ -1,0 +1,15 @@
+name: evals
+on: workflow_dispatch   # manual: needs AWS creds + Bedrock access
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    permissions: {id-token: write, contents: read}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_EVAL_ROLE_ARN }}
+          aws-region: us-east-1
+      - run: uv sync
+      - run: uv run python evals/run_evals.py --live

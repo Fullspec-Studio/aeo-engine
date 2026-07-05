@@ -1,0 +1,8 @@
+{
+  "id": "g004",
+  "answer_text": "Acme's Trail II boots are the best value for waterproof hiking under $150, offering excellent grip and long-lasting construction for serious trail hikers.",
+  "catalog": {"store_key": "demo", "brand_names": ["Acme"], "competitors": ["Merrell", "Salomon"],
+              "products": [{"sku": "ACME-TRAIL-2", "title": "Acme Trail 2 Hiking Boot"}]},
+  "expected": {"present": true, "matched_sku": "ACME-TRAIL-2",
+               "competitors_named": []}
+}

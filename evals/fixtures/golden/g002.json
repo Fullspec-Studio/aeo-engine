@@ -1,0 +1,8 @@
+{
+  "id": "g002",
+  "answer_text": "For waterproof hiking boots under $150, the Merrell Moab 3 is the clear top choice for all-terrain performance. The Salomon X Ultra 4 is a strong runner-up with superior ankle support.",
+  "catalog": {"store_key": "demo", "brand_names": ["Acme"], "competitors": ["Merrell", "Salomon"],
+              "products": [{"sku": "ACME-TRAIL-2", "title": "Acme Trail 2 Hiking Boot"}]},
+  "expected": {"present": false, "matched_sku": null,
+               "competitors_named": ["Merrell Moab 3", "Salomon X Ultra 4"]}
+}
