@@ -28,3 +28,12 @@ def test_competitor_does_not_match():
 def test_generic_brand_mention_does_not_match_a_sku():
     # Brand alone is ambiguous between two products — must not match either.
     assert match_product("Acme", PRODUCTS) is None
+
+
+def test_single_token_title_matches():
+    products = [Product(sku="ACME-WIDGET", title="Widget")]
+    assert match_product("the Widget", products) == "ACME-WIDGET"
+
+
+def test_sku_mention_matches():
+    assert match_product("I recommend the ACME-TRAIL-2", PRODUCTS) == "ACME-TRAIL-2"
