@@ -38,9 +38,13 @@ class PipelineStack(cdk.Stack):
         handlers = {n: make_lambda(self, n, f"aeo.pipeline.handlers.{h}", vpc, db_secret)
                     for n, h in zip(names, ["plan_run", "query_engines", "analyze",
                                             "diagnose_and_draft", "persist"])}
-        # Raw bucket + bucket env: QueryEngines only
+        # Raw bucket + bucket env: QueryEngines (read/write), DiagnoseAndDraft (write), Persist (read)
         raw_bucket.grant_read_write(handlers["QueryEngines"])
         handlers["QueryEngines"].add_environment("AEO_RAW_BUCKET", raw_bucket.bucket_name)
+        raw_bucket.grant_write(handlers["DiagnoseAndDraft"])
+        handlers["DiagnoseAndDraft"].add_environment("AEO_RAW_BUCKET", raw_bucket.bucket_name)
+        raw_bucket.grant_read(handlers["Persist"])
+        handlers["Persist"].add_environment("AEO_RAW_BUCKET", raw_bucket.bucket_name)
 
         # Bedrock: QueryEngines, Analyze, DiagnoseAndDraft
         for name in ("QueryEngines", "Analyze", "DiagnoseAndDraft"):

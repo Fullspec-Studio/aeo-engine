@@ -172,12 +172,12 @@ def analyze(event, context):
 
 
 def diagnose_and_draft(event, context):
-    conn, bedrock, *_ = _clients()
+    conn, bedrock, s3, _ = _clients()
     products, _, _ = _load_products(conn, event["store_id"])
     gr_id = os.environ.get("AEO_GUARDRAIL_ID", "")
     gr_ver = os.environ.get("AEO_GUARDRAIL_VERSION", "DRAFT")
     for obs in event["observations"]:
-        if obs["samples_present"] == 0 and obs["confidence_flag"] == "ok" and obs["losing_texts"]:
+        if obs["samples_present"] == 0 and obs["confidence_flag"] == "ok" and obs.get("losing_texts"):
             winners = obs["competitors_named"]
             product = products[0] if products else None  # v1: diagnose against representative product
             if product is None:
@@ -187,7 +187,28 @@ def diagnose_and_draft(event, context):
                 obs["diagnosis"] = result.model_dump()
             elif isinstance(result, Refusal):
                 obs["diagnosis"] = {"refused": True, "reason": result.reason}
-    return event
+
+    # Claim-check: strip losing_texts from every observation — diagnosis is complete,
+    # these texts are the main contributor to the 256 KB Map iteration limit.
+    for obs in event["observations"]:
+        obs.pop("losing_texts", None)
+
+    run_id = event["run_id"]
+    store_id = event["store_id"]
+    # All observations in a Map iteration share the same prompt_id.
+    prompt_id = event["observations"][0]["prompt_id"] if event["observations"] else ""
+    result_payload = {
+        "run_id": run_id,
+        "store_id": store_id,
+        "prompt_id": prompt_id,
+        "observations": event["observations"],
+    }
+    bucket = os.environ["AEO_RAW_BUCKET"]
+    s3_key = f"runs/{run_id}/results/{prompt_id}.json"
+    s3.put_object(Bucket=bucket, Key=s3_key, Body=json.dumps(result_payload))
+
+    return {"run_id": run_id, "store_id": store_id, "prompt_id": prompt_id,
+            "result_s3_key": s3_key}
 
 
 def persist(event, context):
@@ -195,31 +216,35 @@ def persist(event, context):
         conn, *_ = _clients()
         repo.finish_run(conn, event["run_id"], "failed", 0.0)
         return {"run_id": event["run_id"], "status": "failed", "coverage": 0.0}
-    conn, *_ = _clients()
+    conn, _, s3, _ = _clients()
     run_id = event["run_id"]
     expected = event.get("expected_observations", 0)
+    bucket = os.environ["AEO_RAW_BUCKET"]
+    all_observations: list[dict] = []
     for item in event["items"]:
-        for obs in item["observations"]:
-            oid = repo.insert_observation(
-                conn, run_id, obs["prompt_id"], engine=obs["engine"], model=obs["model"],
-                samples_total=obs["samples_total"], samples_present=obs["samples_present"],
-                rank=obs["rank"], sentiment=obs["sentiment"], framing=obs["framing"],
-                competitors_named=obs["competitors_named"], citations=obs["citations"],
-                confidence_flag=obs["confidence_flag"], raw_s3_keys=obs["raw_s3_keys"])
-            diag = obs.get("diagnosis")
-            if diag and not diag.get("refused"):
-                did = repo.insert_diagnosis(conn, oid, diag["reasons"], diag["priority"])
-                for fix in diag.get("fixes", []):
-                    repo.insert_fix_draft(conn, did, fix["kind"], fix["content"])
-            elif diag and diag.get("refused"):
-                did = repo.insert_diagnosis(conn, oid, ["guardrail_refused"], "high")
-                repo.insert_fix_draft(conn, did, "copy", "", status="refused",
-                                      refusal_reason=diag["reason"])
-    obs_with_samples = sum(
-        1 for item in event["items"]
-        for obs in item["observations"]
-        if obs["samples_total"] > 0
-    )
+        if not item.get("result_s3_key"):
+            # Defensive: slim pointer missing — skip and count as shortfall.
+            continue
+        resp = s3.get_object(Bucket=bucket, Key=item["result_s3_key"])
+        result_data = json.loads(resp["Body"].read())
+        all_observations.extend(result_data["observations"])
+    for obs in all_observations:
+        oid = repo.insert_observation(
+            conn, run_id, obs["prompt_id"], engine=obs["engine"], model=obs["model"],
+            samples_total=obs["samples_total"], samples_present=obs["samples_present"],
+            rank=obs["rank"], sentiment=obs["sentiment"], framing=obs["framing"],
+            competitors_named=obs["competitors_named"], citations=obs["citations"],
+            confidence_flag=obs["confidence_flag"], raw_s3_keys=obs["raw_s3_keys"])
+        diag = obs.get("diagnosis")
+        if diag and not diag.get("refused"):
+            did = repo.insert_diagnosis(conn, oid, diag["reasons"], diag["priority"])
+            for fix in diag.get("fixes", []):
+                repo.insert_fix_draft(conn, did, fix["kind"], fix["content"])
+        elif diag and diag.get("refused"):
+            did = repo.insert_diagnosis(conn, oid, ["guardrail_refused"], "high")
+            repo.insert_fix_draft(conn, did, "copy", "", status="refused",
+                                  refusal_reason=diag["reason"])
+    obs_with_samples = sum(1 for obs in all_observations if obs["samples_total"] > 0)
     coverage = obs_with_samples / expected if expected else 1.0
     status = "complete" if coverage >= 1.0 else "degraded"
     repo.finish_run(conn, run_id, status, coverage)
