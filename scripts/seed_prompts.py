@@ -1,6 +1,17 @@
 #!/usr/bin/env python3
 """Seed prompts for a store into the AEO database.
 
+NOTE — deployed-environment route: use the Ingest Lambda admin action instead of
+this script, since Aurora lives in a private subnet and requires VPC network access:
+
+    INGEST_FN=$(aws cloudformation describe-stack-resources --stack-name AeoApi \
+      --query "StackResources[?LogicalResourceId=='Ingest'].PhysicalResourceId" --output text)
+    aws lambda invoke --function-name "$INGEST_FN" \
+      --payload '{"admin_action": "seed_prompts", "store_key": "demo-outdoor-store"}' \
+      --cli-binary-format raw-in-base64-out /dev/stdout
+
+This script is still useful for local development against the Docker Postgres instance.
+
 Usage:
     uv run python scripts/seed_prompts.py demo-outdoor-store
     uv run python scripts/seed_prompts.py demo-outdoor-store --version 2 --cap 15

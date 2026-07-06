@@ -6,9 +6,10 @@ have this profile enabled (us-east-1, us-west-2, or us-gov-west-1)."""
 DEFAULT_SAMPLES_PER_PROMPT = 5
 MAX_CALLS_PER_RUN = 4000
 
-# Engines queried during monitoring runs.
+# Engines queried during monitoring runs. Verified live in us-west-2
+# (access-probed 2026-07-05): Anthropic routes via cross-region profile.
 BEDROCK_MODEL_IDS = [
-    "anthropic.claude-3-5-haiku-20241022-v1:0",
+    "us.anthropic.claude-haiku-4-5-20251001-v1:0",
     "meta.llama3-1-70b-instruct-v1:0",
     "mistral.mistral-large-2402-v1:0",
 ]

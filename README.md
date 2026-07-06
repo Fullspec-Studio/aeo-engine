@@ -109,9 +109,12 @@ CDK deploys in dependency order: `AeoData` first (VPC, Aurora, S3), then
 After the first deploy:
 
 ```bash
-# 5. Apply the database schema (one-off)
-export AEO_DSN="postgresql://..."   # grab from Secrets Manager or cdk output
-uv run python -c "from aeo.db import repo; conn = repo.connect('$AEO_DSN'); repo.apply_schema(conn)"
+# 5. Apply the database schema (one-off, runs inside the VPC via the Ingest Lambda)
+INGEST_FN=$(aws cloudformation describe-stack-resources --stack-name AeoApi \
+  --query "StackResources[?LogicalResourceId=='Ingest'].PhysicalResourceId" --output text)
+aws lambda invoke --function-name "$INGEST_FN" \
+  --payload '{"admin_action": "apply_schema"}' \
+  --cli-binary-format raw-in-base64-out /dev/stdout
 
 # 6. Ingest your first store catalog
 API_URL=$(aws cloudformation describe-stacks --stack-name AeoApi \
@@ -124,7 +127,9 @@ curl -X POST "$API_URL/catalog" \
      -d @tests/fixtures/catalog_push.json
 
 # 7. Seed prompts (generates AI-powered buyer-intent questions for your catalog)
-uv run python scripts/seed_prompts.py demo-outdoor-store
+aws lambda invoke --function-name "$INGEST_FN" \
+  --payload '{"admin_action": "seed_prompts", "store_key": "demo-outdoor-store"}' \
+  --cli-binary-format raw-in-base64-out /dev/stdout
 ```
 
 ---
