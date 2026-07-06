@@ -17,7 +17,7 @@ def test_data_stack_has_serverless_v2_and_bucket():
     data, _ = _synth()
     data.resource_count_is("AWS::S3::Bucket", 1)
     data.has_resource_properties("AWS::RDS::DBCluster",
-                                 {"ServerlessV2ScalingConfiguration": {"MinCapacity": 0.5}})
+                                 {"ServerlessV2ScalingConfiguration": {"MinCapacity": 0}})
 
 
 def test_pipeline_has_state_machine_scheduler_and_five_lambdas():

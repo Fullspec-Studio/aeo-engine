@@ -16,7 +16,9 @@ class DataStack(cdk.Stack):
             engine=rds.DatabaseClusterEngine.aurora_postgres(
                 version=rds.AuroraPostgresEngineVersion.VER_16_4),
             writer=rds.ClusterInstance.serverless_v2("writer"),
-            serverless_v2_min_capacity=0.5,
+            # min 0 = auto-pause when idle (~$0 idle cost for the demo/portfolio
+            # phase); first query after a pause takes ~10-15s to resume.
+            serverless_v2_min_capacity=0,
             serverless_v2_max_capacity=2,
             vpc=self.vpc,
             default_database_name="aeo",
