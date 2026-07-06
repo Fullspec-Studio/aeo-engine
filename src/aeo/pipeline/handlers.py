@@ -65,8 +65,11 @@ def _clients():
         _bedrock = boto3.client("bedrock-runtime")
         _s3 = boto3.client("s3")
         _comprehend = boto3.client("comprehend")
+    dsn = _resolve_dsn()
     if _conn is None:
-        _conn = repo.connect(_resolve_dsn())
+        _conn = repo.connect_with_retry(dsn)
+    else:
+        _conn = repo.ensure_alive(_conn, dsn)
     return _conn, _bedrock, _s3, _comprehend
 
 

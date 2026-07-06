@@ -45,9 +45,11 @@ def test_conn_factory_uses_secret_arn_when_dsn_unset():
     env = {k: v for k, v in os.environ.items() if k != "AEO_DSN"}
     env["AEO_DSN_SECRET_ARN"] = "arn:aws:secretsmanager:us-east-1:123:secret:aeo-dsn"
 
+    # _conn_factory now calls repo.connect_with_retry (not repo.connect directly);
+    # patch target updated to match the new call path.
     with patch.dict(os.environ, env, clear=True), \
          patch("boto3.client", return_value=fake_sm) as mock_client, \
-         patch.object(mod.repo, "connect", return_value=MagicMock()) as mock_connect:
+         patch.object(mod.repo, "connect_with_retry", return_value=MagicMock()) as mock_connect:
         mod._conn_factory()
 
     mock_client.assert_called_once_with("secretsmanager")

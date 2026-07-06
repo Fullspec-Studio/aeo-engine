@@ -1,5 +1,6 @@
 """Thin data-access layer. All functions take an open psycopg connection."""
 import json
+import time
 from importlib import resources
 
 import psycopg
@@ -8,7 +9,40 @@ from aeo.models import Product, PromptSpec
 
 
 def connect(dsn: str) -> psycopg.Connection:
-    return psycopg.connect(dsn, autocommit=True)
+    return psycopg.connect(
+        dsn, autocommit=True, connect_timeout=10,
+        keepalives=1, keepalives_idle=60, keepalives_interval=10, keepalives_count=3,
+    )
+
+
+def connect_with_retry(dsn: str, attempts: int = 4, sleeper=time.sleep) -> psycopg.Connection:
+    """Try to connect; on OperationalError sleep 5s * attempt-number and retry.
+
+    Absorbs the ~15 s Aurora Serverless v2 auto-pause resume window.
+    Re-raises after the last attempt.
+    """
+    for attempt in range(1, attempts + 1):
+        try:
+            return connect(dsn)
+        except psycopg.OperationalError:
+            if attempt == attempts:
+                raise
+            sleeper(5 * attempt)
+
+
+def ensure_alive(conn, dsn: str, sleeper=time.sleep) -> psycopg.Connection:
+    """Ping *conn* with SELECT 1; replace it via connect_with_retry if stale.
+
+    Handles both OperationalError (dead TCP socket / NAT timeout) and
+    InterfaceError (psycopg connection already closed).  Returns either the
+    same connection object (healthy) or a fresh one (reconnected).
+    """
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+        return conn
+    except (psycopg.OperationalError, psycopg.InterfaceError):
+        return connect_with_retry(dsn, sleeper=sleeper)
 
 
 def apply_schema(conn) -> None:

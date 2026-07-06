@@ -26,12 +26,14 @@ def _build_dsn_from_secret(arn: str) -> str:
 
 def _conn_factory():
     global _conn
+    dsn = os.environ.get("AEO_DSN")
+    if not dsn:
+        arn = os.environ["AEO_DSN_SECRET_ARN"]
+        dsn = _build_dsn_from_secret(arn)
     if _conn is None:
-        dsn = os.environ.get("AEO_DSN")
-        if not dsn:
-            arn = os.environ["AEO_DSN_SECRET_ARN"]
-            dsn = _build_dsn_from_secret(arn)
-        _conn = repo.connect(dsn)
+        _conn = repo.connect_with_retry(dsn)
+    else:
+        _conn = repo.ensure_alive(_conn, dsn)
     return _conn
 
 

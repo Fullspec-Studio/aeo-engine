@@ -50,9 +50,11 @@ def test_fold_envelope_partial_unparseable_is_low_confidence():
 
 
 def test_plan_run_enforces_cost_cap():
-    fake_repo = MagicMock()
+    # _resolve_dsn is now called unconditionally in _clients() so that ensure_alive
+    # has the DSN available for reconnect — stub it to avoid KeyError in test env.
     with patch.object(handlers, "_load_store_and_prompts") as loader, \
-         patch.object(handlers, "_conn", MagicMock()):
+         patch.object(handlers, "_conn", MagicMock()), \
+         patch.object(handlers, "_resolve_dsn", return_value="postgresql://fake/test"):
         loader.return_value = (1, [{"prompt_id": i, "prompt_text": f"q{i}"} for i in range(500)])
         with pytest.raises(CostCapExceeded):
             handlers.plan_run({"store_key": "demo"}, None)
@@ -60,9 +62,12 @@ def test_plan_run_enforces_cost_cap():
 
 
 def test_plan_run_returns_expected_observations():
+    # _resolve_dsn is now called unconditionally in _clients() so that ensure_alive
+    # has the DSN available for reconnect — stub it to avoid KeyError in test env.
     with patch.object(handlers, "_load_store_and_prompts") as loader, \
          patch.object(handlers, "repo") as mock_repo, \
-         patch.object(handlers, "_conn", MagicMock()):
+         patch.object(handlers, "_conn", MagicMock()), \
+         patch.object(handlers, "_resolve_dsn", return_value="postgresql://fake/test"):
         loader.return_value = (1, [{"prompt_id": 1, "prompt_text": "q1"},
                                    {"prompt_id": 2, "prompt_text": "q2"}])
         mock_repo.create_run.return_value = 42
