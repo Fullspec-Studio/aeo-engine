@@ -23,5 +23,10 @@ class DataStack(cdk.Stack):
             vpc=self.vpc,
             default_database_name="aeo",
         )
+        # Lambdas (api + pipeline stacks) live in this VPC and need 5432;
+        # scope ingress to the VPC CIDR rather than per-function SGs to keep
+        # the cross-stack wiring simple. Nothing outside the VPC can route here.
+        cluster.connections.allow_default_port_from(
+            ec2.Peer.ipv4(self.vpc.vpc_cidr_block), "postgres from within vpc")
         self.db_secret = cluster.secret
         self.db_cluster = cluster
