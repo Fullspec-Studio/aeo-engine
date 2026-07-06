@@ -52,7 +52,11 @@ def judge_answer(bedrock, answer_text: str, products: list[Product],
         "Determine whether any catalog product is recommended, its rank among all "
         "recommendations, sentiment and framing toward it, all competitor products named, "
         "and any cited sources. Use the record_observation tool. Be strict: only mark "
-        "present=true when a catalog product is clearly recommended."
+        "present=true when a catalog product is RECOMMENDED — actively endorsed as a "
+        "product to buy or consider. A catalog product that is merely mentioned, "
+        "criticized, compared unfavorably, listed as an example, or named without "
+        "endorsement is present=false (still record sentiment/framing for it). "
+        "Mention is not recommendation."
     )
     messages = [{"role": "user", "content": [{"text":
         _catalog_context(products, brand_names, competitors) + "\n\nANSWER TO ANALYZE:\n" + answer_text}]}]

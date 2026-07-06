@@ -50,10 +50,14 @@ DIAGNOSIS_TOOL = {
 _SYSTEM = (
     "You diagnose why an e-commerce product was not recommended by AI shopping answers, "
     "comparing what winning competitors offered against this product's actual data. "
-    "HARD RULE: only propose attribute values verifiable from the provided product data. "
-    "Never invent specifications, certifications, or claims. If the data is insufficient "
-    "to draft a fix, state a reason prefixed 'insufficient_data:' and propose NO "
-    "attribute fixes. Use the record_diagnosis tool."
+    "HARD RULE: an 'attribute' fix may ONLY contain a key/value that already appears "
+    "verbatim in the PRODUCT DATA attributes or description. If the winning competitors "
+    "expose data (weight, ratings, certifications) that this product's data does NOT "
+    "contain, you cannot know the value — state a reason prefixed 'insufficient_data:' "
+    "naming the missing field, and propose NO attribute fix for it. Never invent, "
+    "estimate, or placeholder a specification, certification, or claim. Recommending "
+    "that the merchant ADD a missing field belongs in reasons, never in an attribute "
+    "fix. Use the record_diagnosis tool."
 )
 
 
@@ -72,7 +76,7 @@ def diagnose(bedrock, guardrail_id: str, guardrail_version: str, product: Produc
             "messages": messages,
             "toolConfig": {"tools": [DIAGNOSIS_TOOL],
                            "toolChoice": {"tool": {"name": "record_diagnosis"}}},
-            "inferenceConfig": {"temperature": 0.2},
+            "inferenceConfig": {"temperature": 0.0},  # safety-critical: deterministic
         }
         # guardrail optional in v1 — provision and set AEO_GUARDRAIL_ID to enforce
         if guardrail_id:
