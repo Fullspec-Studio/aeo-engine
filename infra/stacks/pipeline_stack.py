@@ -10,6 +10,11 @@ def make_lambda(scope, name: str, handler: str, vpc, db_secret) -> lam.Function:
     fn = lam.Function(
         scope, name,
         runtime=lam.Runtime.PYTHON_3_12,
+        # ARM64 matches the arm64 bundling image on Apple Silicon dev machines
+        # (compiled wheels like pydantic-core must match the function arch) and
+        # runs cheaper on Graviton. If deploying from an x86 host, pin the pip
+        # platform instead.
+        architecture=lam.Architecture.ARM_64,
         handler=handler,
         code=lam.Code.from_asset(
             ".", bundling=cdk.BundlingOptions(
