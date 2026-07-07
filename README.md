@@ -1,5 +1,14 @@
 # AEO Monitoring Engine
 
+## Live showcase
+
+Artifacts from the deployed system (us-west-2), captured from real runs:
+
+- [Step Functions execution graph](docs/showcase/stepfunctions-run36.png) — the full fan-out, run 36, all green
+- [Evidence chain](docs/showcase/evidence-chain.md) — one buyer-intent prompt end to end: raw answer → judged observation → diagnosis → drafted fixes
+- [Eval gate](docs/showcase/eval-gate.md) — the hand-labeled fixture gate, including the two defects it caught on first live contact
+- [Run analytics](docs/showcase/run-analytics.md) — presence rates by engine and competitor share for the demo store
+
 AEO is an answer-engine monitoring system that tracks how well your products appear
 across LLM-backed search engines (Amazon Bedrock models, Perplexity). It
 continuously samples prompts, judges responses for brand presence and quality, and
