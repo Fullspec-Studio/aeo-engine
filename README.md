@@ -4,6 +4,7 @@
 
 Artifacts from the deployed system (us-west-2), captured from real runs:
 
+- [Interactive dashboard demo](https://claude.ai/code/artifact/9744f9e1-2d6a-496d-ae22-ab2bda238481) — visibility, share-of-voice, and fix drafts for the demo store
 - [Step Functions execution graph](docs/showcase/stepfunctions-run36.png) — the full fan-out, run 36, all green
 - [Evidence chain](docs/showcase/evidence-chain.md) — one buyer-intent prompt end to end: raw answer → judged observation → diagnosis → drafted fixes
 - [Eval gate](docs/showcase/eval-gate.md) — the hand-labeled fixture gate, including the two defects it caught on first live contact
