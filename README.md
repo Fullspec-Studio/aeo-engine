@@ -1,5 +1,7 @@
 # AEO Monitoring Engine
 
+> This is the open-source measurement methodology behind **[AnswerEng](https://answereng.io)**. To measure your own WooCommerce store, install the free [AnswerEng for WooCommerce](https://wordpress.org/plugins/answereng-for-woocommerce/) plugin from WordPress.org.
+
 ## Live showcase
 
 Artifacts from the deployed system (us-west-2), captured from real runs:
